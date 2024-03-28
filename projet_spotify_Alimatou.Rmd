@@ -1,0 +1,441 @@
+---
+title: "Projet Stats bayesienne"
+author: "Alimatou Traore"
+date: "2024-03-27"
+output: html_document
+---
+
+
+
+
+
+```{r}
+options(warn = -1)
+library(ggplot2)
+library(ggridges)
+library(ggExtra)
+library(dplyr)
+library(rjags)
+library(coda)
+library(openintro)
+library(mosaic)
+library(runjags)
+library(tidyverse)
+library(coda)
+
+```
+
+
+
+```{r}
+
+library(readr)
+spotify_preferences <- read_csv("C:/Users/alima/OneDrive/Bureau/M2 DS/Statistique bayee/spotify_preferences.csv")
+```
+
+
+
+```{r}
+spotify_preferences$mode <- as.factor(spotify_preferences$mode)
+spotify_preferences$label <- as.factor(spotify_preferences$label)
+```
+
+
+
+
+```{r}
+model <- glm(label ~ danceability + energy + loudness + speechiness + acousticness + instrumentalness + liveness + valence + tempo + duration,time_signature,
+             data = spotify_preferences, 
+             family = binomial(link = "logit"))
+summary(model)
+```
+
+```{r}
+
+plot_credible_intervals <- function(fit) {
+  # Extract the MCMC samples and the names of the parameters
+  samples <- as.data.frame(jags_samples$mcmc %>% lapply(as_tibble) %>% bind_rows())
+  params <- names(samples)
+
+  # Calculate the 50% and 95% credible intervals for each parameter
+  intervals <- data.frame(param = character(), lower = numeric(), upper = numeric())
+  for (param in params) {
+    est_mean = mean(samples[[param]])
+    est_median = median(samples[[param]])
+    ci_50_infCI <- quantile(samples[[param]], probs = 0.25)
+    ci_50_supCI <- quantile(samples[[param]], probs = 0.75)
+    ci_95_infCI <- quantile(samples[[param]], probs = 0.025)
+    ci_95_supCI <- quantile(samples[[param]], probs = 0.975)
+    intervals <- rbind(intervals, data.frame(param = param, est_mean = est_mean, est_median = est_median, ci_50_infCI = ci_50_infCI, ci_50_supCI = ci_50_supCI, ci_95_infCI = ci_95_infCI, ci_95_supCI = ci_95_supCI))
+  }
+
+  # Create a ggplot object
+  p <- ggplot(intervals, aes(y = param)) +
+    theme_classic() +
+    geom_segment(aes(y = param, yend = param, x = ci_95_infCI, xend = ci_95_supCI),
+                 color = "red", size = 0.5) +
+    geom_segment(aes(y = param, yend = param, x = ci_50_infCI, xend = ci_50_supCI),
+                 color = "red", size = 1.5) +
+        geom_point(aes(x = est_mean), size = 3) +
+    labs(title = "Posterior credible intervals") + 
+    xlab("")  + 
+    ylab("")
+
+  # Print the plot
+  print(p)
+}
+```
+
+
+
+# Variable Valence 
+
+
+```{r}
+library(ggplot2)
+ggplot(spotify_preferences, aes(x = valence, fill = label)) + 
+  geom_histogram(position = "identity", binwidth = 0.05, alpha = 0.5) + 
+  labs(title = "Histogram of valence by Label", x = "valence", y = "Count") +
+  theme_minimal() 
+
+```
+
+```{r}
+summary(spotify_preferences$valence[spotify_preferences$label=="dislike"])
+
+```
+
+```{r}
+summary(spotify_preferences$valence[spotify_preferences$label=="like"])
+
+```
+
+```{r}
+summary(spotify_preferences$valence)
+
+```
+```{r}
+valence_like <- spotify_preferences$valence[spotify_preferences$label == "like"]
+valence_dislike <- spotify_preferences$valence[spotify_preferences$label == "dislike"]
+```
+
+
+```{r message=FALSE, warning=FALSE}
+model_string <- "
+model {
+  mu1 ~ dunif(0, 1)
+  mu2 ~ dunif(0, 1)
+  sigma1 ~ dunif(0, 1)
+  sigma2 ~ dunif(0, 1)
+  
+  for (i in 1:n1) {
+    y1[i] ~ dnorm(mu1, precision1)
+  }
+  
+  for (i in 1:n2) {
+    y2[i] ~ dnorm(mu2, precision2)
+  }
+  
+  precision1 <- 1 / (sigma1 * sigma1)
+  precision2 <- 1 / (sigma2 * sigma2)
+}
+"
+
+# Définition des données
+y1 <- valence_like
+y2 <- valence_dislike
+data_list <- list(y1 = y1, y2 = y2, n1 = length(y1), n2 = length(y2))
+# Compiling and producing posterior samples from the model.
+jags_samples <- run.jags(model = model_string, data = data_list, monitor = c("mu1", "mu2","sigma1","sigma2"))
+```
+
+
+```{r}
+# Plotting and summarizing the posterior distribution
+jags_samples
+plot_credible_intervals(jags_samples)
+
+```
+
+
+
+
+```{r}
+```
+
+
+
+```{r}
+s <- as.data.frame(jags_samples$mcmc %>% lapply(as_tibble) %>% bind_rows())
+head(s)
+```
+
+
+```{r}
+mean(s$mu1 < s$mu2)
+
+hist(s$mu1 - s$mu2)
+```
+
+
+# Etude des mcmc
+
+
+```{r}
+library(coda)
+
+plot(jags_samples)
+
+gelman.diag(jags_samples)
+
+autocorr.plot(jags_samples)
+```
+
+
+```{r}
+# Convert to mcmc.list for diagnostics
+mcmc_list <- as.mcmc.list(jags_samples)
+
+# Plot trace plots
+traceplot(mcmc_list)
+
+# Calculate R-hat statistic
+gelman.diag(mcmc_list)
+
+# Calculate Effective Sample Size
+effectiveSize(mcmc_list)
+
+# Check autocorrelation
+autocorr.diag(mcmc_list)
+
+```
+
+# Fake data : Valence
+
+
+```{r message=FALSE, warning=FALSE}
+generate_fake_data <- function(n1, n2) {
+  mu1_fake <- 0.5  # Utiliser la médiane au lieu de la moyenne
+  mu2_fake <- 0.5
+  
+  sigma1_fake<-0.1
+  sigma2_fake<-0.1
+  
+  # Générer des données factices à partir de la distribution de Poisson
+  y1_fake <- rnorm(n1, mu1_fake,sigma1_fake)
+  y2_fake <- rnorm(n2, mu2_fake,sigma2_fake)
+  
+  return(list(y1_fake = y1_fake, y2_fake = y2_fake))
+}
+
+# Générer des données factices à partir des échantillons postérieurs
+fake_data <- generate_fake_data(length(valence_like), length(valence_dislike))
+
+# Comparer les données factices avec les données réelles
+summary(fake_data$y1_fake)
+summary(fake_data$y2_fake)
+summary(y1)
+summary(y2)
+
+data_list <- list(y1 = fake_data$y1_fake, y2 = fake_data$y2_fake, n1 = length(fake_data$y1_fake), n2 = length(fake_data$y2_fake))
+
+
+# Compiling and producing posterior samples from the model.
+jags_samples <- run.jags(model = model_string, data = data_list, monitor = c("mu1", "mu2","sigma1","sigma2"))
+
+
+
+```
+
+
+```{r}
+# Plotting and summarizing the posterior distribution
+plot_credible_intervals(jags_samples_sim)
+summary(jags_samples_sim)
+```
+
+
+# Variable tempo
+
+
+```{r}
+summary(spotify_preferences$tempo[spotify_preferences$label=="dislike"])
+
+```
+
+
+
+```{r}
+library(ggplot2)
+ggplot(spotify_preferences, aes(x = tempo, fill = label)) + 
+  geom_histogram(position = "identity", binwidth = 3, alpha = 0.5) + 
+  labs(title = "Histogram of Tempo by Label", x = "Tempo", y = "Count") +
+  theme_minimal() 
+```
+
+
+```{r}
+tempo_like <- spotify_preferences$tempo[spotify_preferences$label == "like"]
+tempo_dislike <- spotify_preferences$tempo[spotify_preferences$label == "dislike"]
+```
+
+
+
+```{r message=FALSE, warning=FALSE}
+
+
+model_string <- "
+model {
+  mu1 ~ dunif(0, 2000)
+  mu2 ~ dunif(0, 2000)
+  sigma1 ~ dunif(0, 1000)
+  sigma2 ~ dunif(0, 1000)
+  
+  for (i in 1:n1) {
+    y1[i] ~ dnorm(mu1, precision1)
+  }
+  
+  for (i in 1:n2) {
+    y2[i] ~ dnorm(mu2, precision2)
+  }
+  
+  precision1 <- 1 / (sigma1 * sigma1)
+  precision2 <- 1 / (sigma2 * sigma2)
+}
+"
+
+# Définition des données
+y1 <- tempo_like
+y2 <- tempo_dislike
+data_list <- list(y1 = y1, y2 = y2, n1 = length(y1), n2 = length(y2))
+# Compiling and producing posterior samples from the model.
+jags_samples <- run.jags(model = model_string, data = data_list, monitor = c("mu1", "mu2","sigma1","sigma2"))
+```
+
+
+
+
+```{r}
+plot_credible_intervals(jags_samples)
+
+```
+
+
+```{r}
+s <- as.data.frame(jags_samples$mcmc %>% lapply(as_tibble) %>% bind_rows())
+head(s)
+```
+
+
+
+
+```{r}
+ # The probability that the rate theta1 is smaller than theta2
+mean(s$mu1 < s$mu2)
+# The above is a short cut for sum(s$theta1 < s$theta2) / nrow(s)
+
+# Plotting distribution of the difference between theta1 and theta2
+hist(s$mu1 - s$mu2)
+```
+
+
+```{r}
+library(coda)
+
+plot(jags_samples)
+
+gelman.diag(jags_samples)
+
+autocorr.plot(jags_samples)
+```
+
+
+```{r}
+# Convert to mcmc.list for diagnostics
+mcmc_list <- as.mcmc.list(jags_samples)
+
+# Plot trace plots
+traceplot(mcmc_list)
+
+# Calculate R-hat statistic
+gelman.diag(mcmc_list)
+
+# Calculate Effective Sample Size
+effectiveSize(mcmc_list)
+
+# Check autocorrelation
+autocorr.diag(mcmc_list)
+
+```
+
+
+# Fake data : tempo
+
+```{r message=FALSE, warning=FALSE}
+generate_fake_data <- function(n1, n2) {
+  mu1_fake <- 100 # Utiliser la médiane au lieu de la moyenne
+  mu2_fake <- 129
+  
+  sigma1_fake<-20
+  sigma2_fake<-10
+  
+  # Générer des données factices à partir de la distribution de Poisson
+  y1_fake <- rnorm(n1, mu1_fake,sigma1_fake)
+  y2_fake <- rnorm(n2, mu2_fake,sigma2_fake)
+  
+  return(list(y1_fake = y1_fake, y2_fake = y2_fake))
+}
+
+# Générer des données factices à partir des échantillons postérieurs
+fake_data <- generate_fake_data(length(valence_like), length(valence_dislike))
+
+# Comparer les données factices avec les données réelles
+summary(fake_data$y1_fake)
+summary(fake_data$y2_fake)
+summary(y1)
+summary(y2)
+
+data_list <- list(y1 = fake_data$y1_fake, y2 = fake_data$y2_fake, n1 = length(fake_data$y1_fake), n2 = length(fake_data$y2_fake))
+
+
+# Compiling and producing posterior samples from the model.
+jags_samples <- run.jags(model = model_string, data = data_list, monitor = c("mu1", "mu2","sigma1","sigma2"))
+
+
+
+```
+
+```{r}
+plot_credible_intervals(jags_samples)
+
+
+```
+
+
+
+# Regression 
+
+```{r}
+
+library(rstanarm)
+set.seed(123)
+
+# Créer une variable binaire (0 ou 1)
+label <- spotify_preferences$label
+label <- ifelse(spotify_preferences$label == "like", 1, 0)
+
+# Créer un data frame avec les données
+#data2 <- data.frame(y = y, x1 = x1,x2=x2,x3=x3,x4=x4,x5=x5,x6=x6)
+
+
+# Spécifier le modèle de régression logistique
+model <- stan_glm(label ~ danceability + energy + valence
+ +  loudness + speechiness + instrumentalness, family = binomial(), data = spotify_preferences)
+
+# Résumé du modèle
+summary(model)
+
+# Afficher les diagnostics
+plot(model)
+```
+
