@@ -17,11 +17,6 @@ library(coda)
 ## I- Importation de la Dataset
 
 ```{r}
-data$label <- as.factor(data$label)
-
-```
-
-```{r}
 data=read.csv("spotify_preferences.csv")
 summary(data)
 ```
