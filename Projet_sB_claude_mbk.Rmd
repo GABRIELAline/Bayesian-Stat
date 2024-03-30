@@ -160,6 +160,30 @@ jags_samples <- run.jags(model = model_string_acc, data = data_list_acc, monitor
 
 plot_credible_intervals(jags_samples,"Posterior credible intervals for accousticness model")
 ```
+```{r}
+s <- as.data.frame(jags_samples$mcmc %>% lapply(as_tibble) %>% bind_rows())
+
+diff_alpha=s$alpha1 - s$alpha2
+diff_beta=s$beta1 - s$beta2
+
+mean_alpha=mean(s$alpha1 < s$alpha2)
+mean_beta=mean(s$beta1 < s$beta2)
+
+hist(diff_alpha)
+hist(diff_beta)
+```
+
+MCMC : Diagnostic de convergence
+
+```{r}
+library(coda)
+
+plot(jags_samples)
+
+gelman.diag(jags_samples)
+
+autocorr.plot(jags_samples)
+```
 
 2) Instrumentalness
 
@@ -185,6 +209,7 @@ ggplot(sample, aes(x = instrumentalness, fill = label)) +
        y = "Fréquence") +
   scale_fill_manual(values = c("red", "blue"))  # Définir les couleurs pour chaque label
 ```
+
 
 En observant les données on va partir sur une distribution de poisson pour les deux variables.
 
@@ -243,6 +268,19 @@ hist(diff_alpha)
 hist(diff_beta)
 ```
 
+MCMC : Diagnostic de convergence
+
+```{r}
+library(coda)
+
+plot(jags_samples)
+
+gelman.diag(jags_samples)
+
+autocorr.plot(jags_samples)
+```
+
+
 3) Liveness
 
 **description**Detects the presence of an audience in the
@@ -255,9 +293,12 @@ beta_density <- function(x, alpha, beta) {
   dbeta(x, shape1 = alpha, shape2 = beta)
 }
 
+plot(beta_density(seq(0,1,0.001),2.5,15))
+
 ggplot(sample, aes(x = liveness, fill = label)) +
   geom_histogram(alpha = 0.5, position = "identity", bins = 30) +
-  stat_function(fun = beta_density, args = list(alpha = 2.5, beta = 15), color = "black") +  # Add gamma density curve
+  stat_function(fun = beta_density, args = list(alpha = 1.2, beta = 3.2), color = "blue") +  # Add gamma density curve
+  stat_function(fun = beta_density, args = list(alpha = 1.8, beta = 5.5), color = "red") +  # Add gamma density curve
   labs(title = "Histogramme des valeurs en fonction du label",
        x = "Liveness",
        y = "Fréquence") +
@@ -269,10 +310,10 @@ Observation, on en déduit une loi beta
 
 model_string_liv <- "
 model {
-  alpha1 ~ dunif(0,3);
-  alpha2 ~ dunif(0,3);
-  beta1 ~ dunif(10,20);
-  beta2 ~ dunif(10,20);
+  alpha1 ~ dunif(0,10);
+  alpha2 ~ dunif(0,10);
+  beta1 ~ dunif(0,80);
+  beta2 ~ dunif(0,80);
   
   for (i in 1:n1) {
     y1[i] ~ dbeta(alpha1,beta1);
@@ -310,6 +351,18 @@ mean_beta=mean(s$beta1 < s$beta2)
 
 hist(diff_alpha)
 hist(diff_beta)
+```
+
+MCMC : Diagnostic de convergence
+
+```{r}
+library(coda)
+
+plot(jags_samples)
+
+gelman.diag(jags_samples)
+
+autocorr.plot(jags_samples)
 ```
 
 # Essaie Regression Stan
