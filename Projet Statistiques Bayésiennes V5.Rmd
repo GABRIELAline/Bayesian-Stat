@@ -1,6 +1,6 @@
 ---
 title: "Projet Statistiques Bayésiennes : Données Spotify"
-author: "Aline GABRIEL"
+author: "Aline GABRIEL, Alimatou TRAORE, Claude MBIMBIKI, Muriel MAJUM and Lyne NENGUEKO"
 date: "2024-03-26"
 output:
   html_document:
@@ -388,6 +388,10 @@ musiques pas très bruyantes.
 
 ## MCMC
 
+```{r}
+plot(jags_samples)
+```
+
 ## Fake data check
 
 ```{r}
@@ -429,7 +433,7 @@ summary(jags_samples)
 
 ```
 
-**Conclusion** : je ne sais pas comment interpréter les sigmas
+**Conclusion** : Le modèle choisi est bien confirmé.
 
 # 5- Variable : mode
 
@@ -473,6 +477,10 @@ plot_credible_intervals(jags_samples)
 
 ## Etude des mcmc
 
+```{r}
+plot(jags_samples)
+```
+
 
 ## Fake data check
 
@@ -513,7 +521,7 @@ summary(jags_samples)
 
 ```
 
-**Conclusion :**
+**Conclusion :** Avec le plot suivant, les données fausses confirment bien notres modèle
 
 # 6- Variable : speechiness
 
@@ -585,6 +593,9 @@ hist(s$alpha2 - s$alpha1)
 
 ## Etude des mcmc
 
+```{r}
+plot(jags_samples)
+```
 
 ## Fake data check
 
@@ -621,7 +632,7 @@ summary(jags_samples)
 
 ```
 
-**Conclusion :**
+**Conclusion :** Le beta2 trouvé par le modèle ne correspond tout a fait à celui considéré au départ lors de la simulation. Ce qui remet en cause l'exactitude du modèle.
 
 # 7- Variable : acousticness
 
