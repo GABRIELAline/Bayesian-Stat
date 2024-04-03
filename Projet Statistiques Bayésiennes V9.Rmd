@@ -1767,8 +1767,8 @@ effectiveSize(jags_samples)
 
 ```{r}
 generate_fake_data <- function(n1, n2) {
-  lambda1_fake <- 4  # Utiliser la médiane au lieu de la moyenne
-  lambda2_fake <- 5
+  lambda1_fake <- 4  
+  lambda2_fake <- 3.5
   
   # Générer des données factices à partir de la distribution de Poisson
   y1_fake <- rpois(n1, lambda1_fake)
